@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salud — Santiago</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #161616; --surface2: #1e1e1e;
+      --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+      --text: #f0f0f0; --text2: #888; --text3: #555;
+      --accent: #c8ff00; --accent-dim: rgba(200,255,0,0.08);
+      --danger: #ff4d4d; --danger-dim: rgba(255,77,77,0.08);
+      --success: #00e5a0; --success-dim: rgba(0,229,160,0.08);
+      --warn: #ffaa00; --warn-dim: rgba(255,170,0,0.08);
+      --mono: 'DM Mono', monospace; --sans: 'DM Sans', sans-serif;
+      --radius: 10px;
+    }
+    html, body { height: 100%; }
+    body { font-family: var(--sans); background: var(--bg); color: var(--text); min-height: 100vh; padding: 0 0 2rem; }
+
+    /* ── TOP NAV ── */
+    .top-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 1.25rem 1.5rem 0;
+      margin-bottom: 1.75rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.25rem;
+      gap: 12px; flex-wrap: wrap;
+    }
+
+    .nav-brand { font-family: var(--mono); font-size: 18px; font-weight: 500; color: var(--accent); }
+    .nav-sub { font-size: 12px; color: var(--text3); font-family: var(--mono); }
+
+    .tab-switcher { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; }
+    .tab-btn {
+      font-family: var(--mono); font-size: 12px; padding: 6px 18px;
+      border-radius: 7px; border: none; background: transparent;
+      color: var(--text3); cursor: pointer; transition: all 0.15s;
+    }
+    .tab-btn.active { background: var(--surface2); color: var(--accent); border: 1px solid var(--border2); }
+
+    /* ── CONTENT PAGES ── */
+    .page { display: none; padding: 0 1.5rem; }
+    .page.active { display: block; }
+
+    /* ── SHARED COMPONENTS ── */
+    .metrics { display: grid; gap: 10px; margin-bottom: 2rem; }
+    .metrics-4 { grid-template-columns: repeat(4, 1fr); }
+    .metrics-3 { grid-template-columns: repeat(3, 1fr); }
+
+    .metric { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+    .metric-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); margin-bottom: 6px; }
+    .metric-value { font-size: 22px; font-weight: 300; font-family: var(--mono); color: var(--text); letter-spacing: -1px; }
+    .metric-value.accent { color: var(--accent); }
+    .metric-value.success { color: var(--success); }
+    .metric-value.warn { color: var(--warn); }
+    .metric-value.danger { color: var(--danger); }
+    .metric-sub { font-size: 11px; color: var(--text3); margin-top: 4px; }
+
+    .section-title { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); margin-bottom: 0.75rem; }
+
+    input, select, textarea {
+      font-family: var(--mono); font-size: 13px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      padding: 9px 12px; outline: none; transition: border-color 0.15s;
+      font-size: 16px; /* previene zoom en iOS */
+      -webkit-appearance: none; appearance: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    input[type="date"], input[type="time"] { color-scheme: dark; }
+    input::placeholder, textarea::placeholder { color: var(--text3); }
+
+    button.btn-add {
+      font-family: var(--mono); font-size: 13px; font-weight: 500;
+      background: var(--accent); color: #0f0f0f; border: none;
+      border-radius: var(--radius); padding: 10px 20px;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap; min-height: 44px;
+    }
+    button.btn-add:hover { opacity: 0.85; }
+    button.btn-add:active { transform: scale(0.97); }
+    button.btn-add:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-del { font-family: var(--mono); font-size: 11px; background: transparent; border: 1px solid var(--border); border-radius: 5px; color: var(--text3); padding: 3px 10px; cursor: pointer; transition: all 0.15s; }
+    .btn-del:hover { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+
+    .empty { text-align: center; color: var(--text3); font-size: 14px; padding: 3rem 0; font-family: var(--mono); }
+
+    .export-btn { font-family: var(--mono); font-size: 12px; background: transparent; border: 1px solid var(--border2); border-radius: 6px; color: var(--text2); padding: 5px 12px; cursor: pointer; transition: all 0.15s; }
+    .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 12px; color: var(--text3); font-family: var(--mono); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); padding: 10px 16px; font-family: var(--mono); font-size: 13px; color: var(--text); opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 999; }
+    .toast.show { opacity: 1; }
+    .toast.ok { border-color: var(--success); color: var(--success); }
+    .toast.err { border-color: var(--danger); color: var(--danger); }
+
+    /* ══════════════════════════════════ */
+    /* PESO                               */
+    /* ══════════════════════════════════ */
+    .sync-status { font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); color: var(--text3); display: inline-flex; align-items: center; gap: 6px; margin-bottom: 1.5rem; }
+    .sync-status .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+    .sync-status.syncing .dot { background: var(--accent); animation: pulse 1s infinite; }
+    .sync-status.ok .dot { background: var(--success); }
+    .sync-status.error .dot { background: var(--danger); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 2rem; position: relative; height: 200px; }
+
+    .peso-form-row { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    #p-fecha { width: 150px; }
+    #p-peso { width: 110px; }
+    #p-nota { flex: 1; min-width: 140px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    thead th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: var(--surface2); }
+    td { padding: 10px 12px; color: var(--text); }
+    td.fecha { font-family: var(--mono); font-size: 13px; color: var(--text2); }
+    td.peso-val { font-family: var(--mono); font-size: 15px; font-weight: 500; }
+    td.nota-val { font-size: 13px; color: var(--text2); }
+
+    .badge { font-family: var(--mono); font-size: 12px; padding: 3px 8px; border-radius: 6px; font-weight: 500; }
+    .badge-up { background: var(--danger-dim); color: var(--danger); }
+    .badge-down { background: var(--success-dim); color: var(--success); }
+    .badge-eq { background: var(--surface2); color: var(--text3); }
+
+    .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; overflow-x: auto; }
+
+    /* ══════════════════════════════════ */
+    /* COMIDAS                            */
+    /* ══════════════════════════════════ */
+    .racha-bar { display: flex; gap: 4px; margin-bottom: 2rem; flex-wrap: wrap; }
+    .racha-dia { width: 28px; height: 28px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; font-family: var(--mono); color: var(--text3); cursor: default; }
+    .racha-dia.ok { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .racha-dia.parcial { background: var(--warn-dim); border-color: var(--warn); color: var(--warn); }
+    .racha-dia.mal { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+
+    .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; }
+    .form-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; align-items: center; }
+    .form-row:last-child { margin-bottom: 0; }
+    textarea { width: 100%; resize: vertical; min-height: 60px; }
+    .comida-input { flex: 1; min-width: 180px; }
+    #c-tipo { width: 140px; }
+    #c-hora { width: 110px; }
+    #c-fecha { width: 150px; }
+
+    .puntuacion-btns { display: flex; gap: 6px; }
+    .punt-btn { font-family: var(--mono); font-size: 12px; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text3); cursor: pointer; transition: all 0.15s; min-height: 36px; }
+    .punt-btn:hover { border-color: var(--border2); color: var(--text); }
+    .punt-btn.selected-ok { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .punt-btn.selected-parcial { background: var(--warn-dim); border-color: var(--warn); color: var(--warn); }
+    .punt-btn.selected-mal { background: var(--danger-dim); border-color: var(--danger); color: var(--danger); }
+
+    .day-group { margin-bottom: 1.5rem; }
+    .day-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 6px; flex-wrap: wrap; gap: 6px; }
+    .day-header-left { font-family: var(--mono); font-size: 13px; color: var(--text2); }
+    .day-badge { font-family: var(--mono); font-size: 11px; padding: 3px 8px; border-radius: 6px; }
+    .badge-ok { background: var(--accent-dim); color: var(--accent); }
+    .badge-parcial { background: var(--warn-dim); color: var(--warn); }
+    .badge-mal { background: var(--danger-dim); color: var(--danger); }
+    .badge-sin { background: var(--surface2); color: var(--text3); }
+
+    .comida-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--surface2); border-radius: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+    .comida-hora { font-family: var(--mono); font-size: 12px; color: var(--text3); min-width: 48px; padding-top: 2px; }
+    .comida-tipo { font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px; min-width: 80px; text-align: center; margin-top: 2px; }
+    .tipo-desayuno { background: rgba(200,255,0,0.08); color: var(--accent); }
+    .tipo-almuerzo { background: rgba(0,229,160,0.08); color: var(--success); }
+    .tipo-cena { background: rgba(255,170,0,0.08); color: var(--warn); }
+    .tipo-snack { background: rgba(255,77,77,0.08); color: var(--danger); }
+    .tipo-otro { background: var(--surface); color: var(--text3); }
+    .comida-desc { flex: 1; min-width: 120px; }
+    .comida-nombre { font-size: 14px; color: var(--text); margin-bottom: 2px; }
+    .comida-nota { font-size: 12px; color: var(--text3); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      .top-nav { padding: 1rem 1rem 1rem; }
+      .page { padding: 0 1rem; }
+      .metrics-4 { grid-template-columns: 1fr 1fr; }
+      .metrics-3 { grid-template-columns: 1fr 1fr; }
+      #p-fecha, #c-fecha { width: 100%; }
+      .tab-btn { padding: 6px 12px; font-size: 11px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- TOP NAV -->
+<div class="top-nav">
+  <div>
+    <div class="nav-brand">// salud.log</div>
+    <div class="nav-sub">control personal — Santiago Botero</div>
+  </div>
+  <div class="tab-switcher">
+    <button class="tab-btn active" onclick="switchTab('peso')">⚖️ Peso</button>
+    <button class="tab-btn" onclick="switchTab('comidas')">🍽️ Comidas</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- PAGE: PESO                             -->
+<!-- ══════════════════════════════════════ -->
+<div class="page active" id="page-peso">
+
+  <div class="sync-status" id="sync-status">
+    <span class="dot"></span>
+    <span id="sync-text">cargando...</span>
+  </div>
+
+  <div class="metrics metrics-3">
+    <div class="metric">
+      <div class="metric-label">Actual</div>
+      <div class="metric-value accent" id="m-actual">—</div>
+      <div class="metric-sub">último registro</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Variación</div>
+      <div class="metric-value" id="m-var">—</div>
+      <div class="metric-sub">desde el inicio</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Registros</div>
+      <div class="metric-value" id="m-count">0</div>
+      <div class="metric-sub">entradas totales</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+  </div>
+
+  <p class="section-title">Nuevo registro</p>
+  <div class="peso-form-row">
+    <input type="date" id="p-fecha" />
+    <input type="number" id="p-peso" placeholder="kg" step="0.1" min="30" max="300" inputmode="decimal" />
+    <input type="text" id="p-nota" placeholder="Nota opcional..." />
+    <button class="btn-add" id="btn-add-peso" onclick="pesoAgregar()">+ Agregar</button>
+  </div>
+
+  <p class="section-title">Historial</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fecha</th><th>Peso</th><th>Cambio</th><th>Nota</th><th></th></tr></thead>
+      <tbody id="peso-tbody"></tbody>
+    </table>
+  </div>
+
+  <footer>
+    <span>guardado localmente</span>
+    <button class="export-btn" onclick="pesoExportarCSV()">exportar CSV</button>
+  </footer>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- PAGE: COMIDAS                          -->
+<!-- ══════════════════════════════════════ -->
+<div class="page" id="page-comidas">
+
+  <div class="metrics metrics-4">
+    <div class="metric">
+      <div class="metric-label">Hoy</div>
+      <div class="metric-value accent" id="m-hoy">0</div>
+      <div class="metric-sub">comidas registradas</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Racha</div>
+      <div class="metric-value success" id="m-racha">0</div>
+      <div class="metric-sub">días consecutivos</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Esta semana</div>
+      <div class="metric-value" id="m-semana">0</div>
+      <div class="metric-sub">registros totales</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Días ok</div>
+      <div class="metric-value warn" id="m-dias-ok">0</div>
+      <div class="metric-sub">plan cumplido</div>
+    </div>
+  </div>
+
+  <p class="section-title">Últimos 14 días</p>
+  <div class="racha-bar" id="racha-bar"></div>
+
+  <p class="section-title">Registrar comida</p>
+  <div class="form-card">
+    <div class="form-row">
+      <input type="date" id="c-fecha" />
+      <input type="time" id="c-hora" />
+      <select id="c-tipo">
+        <option value="desayuno">Desayuno</option>
+        <option value="almuerzo">Almuerzo</option>
+        <option value="cena">Cena</option>
+        <option value="snack">Snack</option>
+        <option value="otro">Otro</option>
+      </select>
+      <input type="text" class="comida-input" id="c-comida" placeholder="¿Qué comiste?" />
+    </div>
+    <div class="form-row">
+      <textarea id="c-nota" placeholder="¿Cómo te sentiste? ¿Hambre? ¿Energía? ¿Antojos?..."></textarea>
+    </div>
+    <div class="form-row" style="justify-content:space-between;align-items:center;">
+      <div>
+        <span style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-right:10px;">¿Cumpliste el plan hoy?</span>
+        <div class="puntuacion-btns" style="display:inline-flex;">
+          <button class="punt-btn" id="punt-ok"     onclick="setPunt('ok')">✓ Sí</button>
+          <button class="punt-btn" id="punt-parcial" onclick="setPunt('parcial')">~ Parcial</button>
+          <button class="punt-btn" id="punt-mal"    onclick="setPunt('mal')">✗ No</button>
+        </div>
+      </div>
+      <button class="btn-add" onclick="comidaAgregar()">+ Registrar</button>
+    </div>
+  </div>
+
+  <p class="section-title">Historial</p>
+  <div id="historial"></div>
+
+  <footer>
+    <span>guardado localmente</span>
+    <button class="export-btn" onclick="comidaExportarCSV()">exportar CSV</button>
+  </footer>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+
+// ══════════════════════════════════════════════════
+// UTILS COMPARTIDOS
+// ══════════════════════════════════════════════════
+function showToast(msg, tipo = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + tipo;
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+
+function safeLoad(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
+  catch(e) { return fallback; }
+}
+
+function safeSave(key, data) {
+  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
+}
+
+// ══════════════════════════════════════════════════
+// TAB SWITCHER
+// ══════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (tab === 'peso') pesoRender();
+  if (tab === 'comidas') comidaRender();
+}
+
+// ══════════════════════════════════════════════════
+// ⚖️ MÓDULO PESO
+// ══════════════════════════════════════════════════
+let registros = safeLoad('sb_peso', []);
+let chart = null;
+
+// Inicializar fecha de peso
+document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
+
+function setSyncStatus(estado, texto) {
+  const el = document.getElementById('sync-status');
+  el.className = 'sync-status ' + estado;
+  document.getElementById('sync-text').textContent = texto;
+}
+
+function pesoAgregar() {
+  const fecha = document.getElementById('p-fecha').value;
+  const peso  = parseFloat(document.getElementById('p-peso').value);
+  const nota  = document.getElementById('p-nota').value.trim();
+  if (!fecha || isNaN(peso) || peso < 30 || peso > 300) {
+    document.getElementById('p-peso').focus(); return;
+  }
+  registros.push({ fecha, peso, nota });
+  registros.sort((a,b) => a.fecha.localeCompare(b.fecha));
+  safeSave('sb_peso', registros);
+  document.getElementById('p-peso').value = '';
+  document.getElementById('p-nota').value = '';
+  showToast('registro guardado ✓', 'ok');
+  setSyncStatus('ok', 'guardado local');
+  pesoRender();
+}
+
+function pesoEliminar(i) {
+  registros.splice(i, 1);
+  safeSave('sb_peso', registros);
+  pesoRender();
+}
+
+function fmtFecha(f) {
+  if (!f) return '';
+  const parts = f.includes('-') ? f.split('-') : f.split('/').reverse();
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+function pesoRender() {
+  const n = registros.length;
+  document.getElementById('m-count').textContent = n;
+
+  if (n === 0) {
+    document.getElementById('m-actual').textContent = '—';
+    document.getElementById('m-actual').className = 'metric-value accent';
+    document.getElementById('m-var').textContent = '—';
+    document.getElementById('m-var').className = 'metric-value';
+    document.getElementById('peso-tbody').innerHTML = '<tr><td colspan="5" class="empty">sin registros aún</td></tr>';
+    if (chart) { chart.destroy(); chart = null; }
+    setSyncStatus('ok', 'sin datos');
+    return;
+  }
+
+  const ultimo  = registros[n-1].peso;
+  const primero = registros[0].peso;
+  const diff    = +(ultimo - primero).toFixed(1);
+
+  document.getElementById('m-actual').textContent = ultimo.toFixed(1) + ' kg';
+  const varEl = document.getElementById('m-var');
+  varEl.textContent = (diff > 0 ? '+' : '') + diff + ' kg';
+  varEl.className = 'metric-value ' + (diff > 0 ? 'danger' : diff < 0 ? 'success' : '');
+
+  let rows = '';
+  for (let i = n-1; i >= 0; i--) {
+    const r = registros[i];
+    let badge = '';
+    if (i > 0) {
+      const d = +(r.peso - registros[i-1].peso).toFixed(1);
+      badge = d > 0
+        ? `<span class="badge badge-up">+${d}</span>`
+        : d < 0 ? `<span class="badge badge-down">${d}</span>`
+        : `<span class="badge badge-eq">±0</span>`;
+    } else {
+      badge = `<span class="badge badge-eq">inicio</span>`;
+    }
+    rows += `<tr>
+      <td class="fecha">${fmtFecha(r.fecha)}</td>
+      <td class="peso-val">${r.peso.toFixed(1)} kg</td>
+      <td>${badge}</td>
+      <td class="nota-val">${r.nota || ''}</td>
+      <td><button class="btn-del" onclick="pesoEliminar(${i})">×</button></td>
+    </tr>`;
+  }
+  document.getElementById('peso-tbody').innerHTML = rows;
+
+  const labels = registros.map(r => fmtFecha(r.fecha));
+  const data   = registros.map(r => r.peso);
+
+  if (chart) chart.destroy();
+  const ctx = document.getElementById('chart').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#c8ff00',
+        backgroundColor: 'rgba(200,255,0,0.05)',
+        borderWidth: 2,
+        pointRadius: 4,
+        pointBackgroundColor: '#c8ff00',
+        pointBorderColor: '#0f0f0f',
+        pointBorderWidth: 2,
+        tension: 0.35,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e1e', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+          titleColor: '#888', bodyColor: '#c8ff00',
+          bodyFont: { family: 'DM Mono', size: 14 },
+          callbacks: { label: ctx => ctx.parsed.y.toFixed(1) + ' kg' }
+        }
+      },
+      scales: {
+        y: { ticks: { color: '#555', font: { family: 'DM Mono', size: 11 }, callback: v => v + ' kg' }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: 'transparent' } },
+        x: { ticks: { color: '#555', font: { family: 'DM Mono', size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 7 }, grid: { display: false }, border: { color: 'rgba(255,255,255,0.07)' } }
+      }
+    }
+  });
+
+  setSyncStatus('ok', 'local');
+}
+
+function pesoExportarCSV() {
+  if (!registros.length) return;
+  const rows = [['Fecha','Peso (kg)','Nota']];
+  registros.forEach(r => rows.push([fmtFecha(r.fecha), r.peso, r.nota || '']));
+  const csv  = rows.map(r => r.join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'peso-santiago.csv'; a.click();
+}
+
+// ══════════════════════════════════════════════════
+// 🍽️ MÓDULO COMIDAS
+// ══════════════════════════════════════════════════
+let cData = safeLoad('sb_comidas', {});
+let puntSelected = null;
+
+// Inicializar fecha y hora de comidas
+const ahora = new Date();
+document.getElementById('c-fecha').value = ahora.toISOString().split('T')[0];
+document.getElementById('c-hora').value  = ahora.toTimeString().slice(0,5);
+
+function comidaGuardar() { safeSave('sb_comidas', cData); }
+
+function setPunt(val) {
+  puntSelected = val;
+  ['ok','parcial','mal'].forEach(v => {
+    document.getElementById('punt-' + v).className = 'punt-btn' + (v === val ? ' selected-' + v : '');
+  });
+}
+
+function comidaAgregar() {
+  const fecha  = document.getElementById('c-fecha').value;
+  const hora   = document.getElementById('c-hora').value;
+  const tipo   = document.getElementById('c-tipo').value;
+  const comida = document.getElementById('c-comida').value.trim();
+  const nota   = document.getElementById('c-nota').value.trim();
+  if (!fecha || !comida) { document.getElementById('c-comida').focus(); return; }
+
+  if (!cData[fecha]) cData[fecha] = { comidas: [], puntuacion: null };
+  cData[fecha].comidas.push({ hora, tipo, comida, nota, id: Date.now() });
+  if (puntSelected) cData[fecha].puntuacion = puntSelected;
+
+  document.getElementById('c-comida').value = '';
+  document.getElementById('c-nota').value   = '';
+  puntSelected = null;
+  ['ok','parcial','mal'].forEach(v => { document.getElementById('punt-' + v).className = 'punt-btn'; });
+
+  comidaGuardar();
+  showToast('comida registrada ✓', 'ok');
+  comidaRender();
+}
+
+function comidaEliminar(fecha, id) {
+  if (!cData[fecha]) return;
+  cData[fecha].comidas = cData[fecha].comidas.filter(c => c.id !== id);
+  if (!cData[fecha].comidas.length && !cData[fecha].puntuacion) delete cData[fecha];
+  comidaGuardar();
+  comidaRender();
+}
+
+function fmtDia(f) {
+  const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const d    = new Date(f + 'T12:00:00');
+  const [y,m,dd] = f.split('-');
+  return dias[d.getDay()] + ' ' + `${dd}/${m}/${y}`;
+}
+
+function comidaRender() {
+  const today  = new Date().toISOString().split('T')[0];
+  const fechas = Object.keys(cData).sort((a,b) => b.localeCompare(a));
+
+  const todayData = cData[today];
+  document.getElementById('m-hoy').textContent = todayData ? todayData.comidas.length : 0;
+
+  const semanaMs    = 7 * 24 * 60 * 60 * 1000;
+  const semanaStart = new Date(Date.now() - semanaMs).toISOString().split('T')[0];
+  let semanaCount   = 0;
+  fechas.forEach(f => { if (f >= semanaStart) semanaCount += (cData[f].comidas || []).length; });
+  document.getElementById('m-semana').textContent = semanaCount;
+  document.getElementById('m-dias-ok').textContent = fechas.filter(f => cData[f].puntuacion === 'ok').length;
+
+  let racha     = 0;
+  let checkDate = new Date();
+  for (let i = 0; i < 60; i++) {
+    const key = checkDate.toISOString().split('T')[0];
+    if (cData[key] && cData[key].comidas.length > 0) racha++;
+    else if (i > 0) break;
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+  document.getElementById('m-racha').textContent = racha;
+
+  // Racha bar
+  const barEl = document.getElementById('racha-bar');
+  barEl.innerHTML = '';
+  for (let i = 13; i >= 0; i--) {
+    const d   = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const dia = document.createElement('div');
+    dia.className = 'racha-dia';
+    dia.textContent = d.getDate();
+    if (cData[key]) {
+      const p = cData[key].puntuacion;
+      if (p === 'ok') dia.classList.add('ok');
+      else if (p === 'parcial') dia.classList.add('parcial');
+      else if (p === 'mal') dia.classList.add('mal');
+      else if (cData[key].comidas.length > 0) dia.classList.add('parcial');
+    }
+    barEl.appendChild(dia);
+  }
+
+  // Historial
+  const histEl = document.getElementById('historial');
+  if (!fechas.length) {
+    histEl.innerHTML = '<div class="empty">sin registros aún</div>';
+    return;
+  }
+
+  histEl.innerHTML = fechas.slice(0,14).map(f => {
+    const d = cData[f];
+    const p = d.puntuacion;
+    let badgeClass = 'badge-sin', badgeText = 'sin evaluar';
+    if (p === 'ok')      { badgeClass = 'badge-ok';     badgeText = '✓ plan cumplido'; }
+    else if (p === 'parcial') { badgeClass = 'badge-parcial'; badgeText = '~ parcial'; }
+    else if (p === 'mal')     { badgeClass = 'badge-mal';     badgeText = '✗ no cumplido'; }
+
+    const comidas = (d.comidas || []).slice().sort((a,b) => a.hora.localeCompare(b.hora)).map(c => `
+      <div class="comida-item">
+        <div class="comida-hora">${c.hora}</div>
+        <div class="comida-tipo tipo-${c.tipo}">${c.tipo}</div>
+        <div class="comida-desc">
+          <div class="comida-nombre">${c.comida}</div>
+          ${c.nota ? `<div class="comida-nota">${c.nota}</div>` : ''}
+        </div>
+        <button class="btn-del" onclick="comidaEliminar('${f}', ${c.id})">×</button>
+      </div>`).join('');
+
+    return `<div class="day-group">
+      <div class="day-header">
+        <div class="day-header-left">${fmtDia(f)} — ${d.comidas.length} comida${d.comidas.length !== 1 ? 's' : ''}</div>
+        <span class="day-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      ${comidas || '<div style="padding:8px 14px;font-size:13px;color:var(--text3);font-family:var(--mono);">sin comidas registradas</div>'}
+    </div>`;
+  }).join('');
+}
+
+function comidaExportarCSV() {
+  const fechas = Object.keys(cData).sort();
+  if (!fechas.length) return;
+  const rows = [['Fecha','Hora','Tipo','Comida','Nota','Plan']];
+  fechas.forEach(f => {
+    (cData[f].comidas || []).forEach(c => {
+      rows.push([f, c.hora, c.tipo, c.comida, c.nota || '', cData[f].puntuacion || '']);
+    });
+  });
+  const csv  = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'comidas-santiago.csv'; a.click();
+}
+
+// ══════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════
+pesoRender();
+setSyncStatus('ok', 'local');
+</script>
+</body>
+</html>
