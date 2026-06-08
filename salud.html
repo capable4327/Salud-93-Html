@@ -333,8 +333,42 @@
 </div>
 
 <!-- SCRIPTS -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
+
+// ══════════════════════════════════════════════════
+// TELEGRAM INIT
+// ══════════════════════════════════════════════════
+const tg = window.Telegram?.WebApp;
+if (tg) { tg.ready(); tg.expand(); }
+
+// ══════════════════════════════════════════════════
+// STORAGE — CloudStorage Telegram + localStorage fallback
+// Guarda en ambos lados para máxima seguridad
+// ══════════════════════════════════════════════════
+function safeSave(key, data) {
+  const json = JSON.stringify(data);
+  try { localStorage.setItem(key, json); } catch(e) {}
+  if (tg?.CloudStorage) {
+    tg.CloudStorage.setItem(key, json, () => {});
+  }
+}
+
+function safeLoad(key, fallback, callback) {
+  if (tg?.CloudStorage) {
+    tg.CloudStorage.getItem(key, (err, value) => {
+      if (!err && value) {
+        try { callback(JSON.parse(value)); return; } catch(e) {}
+      }
+      try { callback(JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback))); }
+      catch(e) { callback(fallback); }
+    });
+  } else {
+    try { callback(JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback))); }
+    catch(e) { callback(fallback); }
+  }
+}
 
 // ══════════════════════════════════════════════════
 // UTILS COMPARTIDOS
@@ -344,15 +378,6 @@ function showToast(msg, tipo = '') {
   t.textContent = msg;
   t.className = 'toast show ' + tipo;
   setTimeout(() => { t.className = 'toast'; }, 2500);
-}
-
-function safeLoad(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); }
-  catch(e) { return fallback; }
-}
-
-function safeSave(key, data) {
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch(e) {}
 }
 
 // ══════════════════════════════════════════════════
@@ -370,10 +395,9 @@ function switchTab(tab) {
 // ══════════════════════════════════════════════════
 // ⚖️ MÓDULO PESO
 // ══════════════════════════════════════════════════
-let registros = safeLoad('sb_peso', []);
+let registros = [];
 let chart = null;
 
-// Inicializar fecha de peso
 document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
 
 function setSyncStatus(estado, texto) {
@@ -395,7 +419,7 @@ function pesoAgregar() {
   document.getElementById('p-peso').value = '';
   document.getElementById('p-nota').value = '';
   showToast('registro guardado ✓', 'ok');
-  setSyncStatus('ok', 'guardado local');
+  setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
   pesoRender();
 }
 
@@ -514,10 +538,9 @@ function pesoExportarCSV() {
 // ══════════════════════════════════════════════════
 // 🍽️ MÓDULO COMIDAS
 // ══════════════════════════════════════════════════
-let cData = safeLoad('sb_comidas', {});
+let cData = {};
 let puntSelected = null;
 
-// Inicializar fecha y hora de comidas
 const ahora = new Date();
 document.getElementById('c-fecha').value = ahora.toISOString().split('T')[0];
 document.getElementById('c-hora').value  = ahora.toTimeString().slice(0,5);
@@ -663,10 +686,20 @@ function comidaExportarCSV() {
 }
 
 // ══════════════════════════════════════════════════
-// INIT
+// INIT — carga datos desde CloudStorage o localStorage
 // ══════════════════════════════════════════════════
-pesoRender();
-setSyncStatus('ok', 'local');
+setSyncStatus('syncing', 'cargando...');
+
+safeLoad('sb_peso', [], (data) => {
+  registros = Array.isArray(data) ? data : [];
+  pesoRender();
+  setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
+});
+
+safeLoad('sb_comidas', {}, (data) => {
+  cData = (data && typeof data === 'object') ? data : {};
+  comidaRender();
+});
 </script>
 </body>
 </html>
