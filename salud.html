@@ -119,6 +119,16 @@
     #p-peso { width: 110px; }
     #p-nota { flex: 1; min-width: 140px; }
 
+    /* NUEVO FORM PESO AMIGABLE */
+    .peso-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; position: relative; z-index: 2; }
+    .peso-input-label { display: block; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text3); margin-bottom: 8px; }
+    .peso-big-input { width: 100%; background: var(--surface2); border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text); font-family: var(--mono); font-size: 28px !important; font-weight: 500; text-align: center; padding: 16px; outline: none; transition: border-color 0.15s; margin-bottom: 14px; letter-spacing: 1px; }
+    .peso-big-input:focus { border-color: var(--accent); }
+    .peso-field { margin-bottom: 14px; }
+    .peso-field input { width: 100%; }
+    .peso-btn-add { width: 100%; background: var(--accent); color: #0f0f0f; border: none; border-radius: var(--radius); font-family: var(--mono); font-size: 15px; font-weight: 500; padding: 16px; cursor: pointer; transition: opacity 0.15s; min-height: 52px; }
+    .peso-btn-add:active { opacity: 0.8; }
+
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     thead th { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text3); padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
     tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
@@ -242,11 +252,18 @@
   </div>
 
   <p class="section-title">Nuevo registro</p>
-  <div class="peso-form-row">
-    <input type="date" id="p-fecha" />
-    <input type="text" id="p-peso" placeholder="kg (ej. 75.5)" inputmode="decimal" autocomplete="off" />
-    <input type="text" id="p-nota" placeholder="Nota opcional..." />
-    <button class="btn-add" id="btn-add-peso" onclick="pesoAgregar()">+ Agregar</button>
+  <div class="peso-card">
+    <label class="peso-input-label">Peso en kg</label>
+    <input type="text" id="p-peso" class="peso-big-input" placeholder="0.0" inputmode="decimal" autocomplete="off" />
+    <div class="peso-field">
+      <label class="peso-input-label">Fecha</label>
+      <input type="date" id="p-fecha" />
+    </div>
+    <div class="peso-field">
+      <label class="peso-input-label">Nota (opcional)</label>
+      <input type="text" id="p-nota" placeholder="Ej. en ayunas, después de entrenar..." />
+    </div>
+    <button class="peso-btn-add" id="btn-add-peso" onclick="pesoAgregar()">+ Agregar registro</button>
   </div>
 
   <p class="section-title">Historial</p>
@@ -409,25 +426,30 @@ function setSyncStatus(estado, texto) {
 
 function pesoAgregar() {
   const fecha = document.getElementById('p-fecha').value;
-  // Aceptar tanto coma como punto decimal (teclado iOS usa coma)
-  const pesoRaw = document.getElementById('p-peso').value.replace(',', '.').trim();
-  const peso  = parseFloat(pesoRaw);
-  const nota  = document.getElementById('p-nota').value.trim();
+  // Limpiar el valor: quitar espacios, cambiar coma por punto, quitar cualquier cosa que no sea número o punto
+  let pesoRaw = document.getElementById('p-peso').value
+    .replace(/\s/g, '')
+    .replace(',', '.')
+    .replace(/[^0-9.]/g, '');
+  const peso = parseFloat(pesoRaw);
+  const nota = document.getElementById('p-nota').value.trim();
+
   if (!fecha) {
     showToast('⚠️ Selecciona una fecha', 'err');
     return;
   }
   if (isNaN(peso) || peso < 20 || peso > 400) {
-    showToast('⚠️ Ingresa un peso válido (ej. 75.5)', 'err');
+    showToast('⚠️ Escribe un peso válido, ej. 75 o 75.5', 'err');
     document.getElementById('p-peso').focus();
     return;
   }
+
   registros.push({ fecha, peso, nota });
   registros.sort((a,b) => a.fecha.localeCompare(b.fecha));
   safeSave('sb_peso', registros);
   document.getElementById('p-peso').value = '';
   document.getElementById('p-nota').value = '';
-  showToast('registro guardado ✓', 'ok');
+  showToast('Registro guardado ✓', 'ok');
   setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
   pesoRender();
 }
