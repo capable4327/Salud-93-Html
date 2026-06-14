@@ -111,9 +111,10 @@
     .sync-status.error .dot { background: var(--danger); }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 2rem; position: relative; height: 200px; }
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 2rem; position: relative; height: 200px; overflow: hidden; z-index: 1; }
+    .chart-wrap canvas { max-width: 100% !important; max-height: 100% !important; }
 
-    .peso-form-row { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .peso-form-row { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; position: relative; z-index: 2; }
     #p-fecha { width: 150px; }
     #p-peso { width: 110px; }
     #p-nota { flex: 1; min-width: 140px; }
