@@ -244,7 +244,7 @@
   <p class="section-title">Nuevo registro</p>
   <div class="peso-form-row">
     <input type="date" id="p-fecha" />
-    <input type="number" id="p-peso" placeholder="kg" step="0.1" min="30" max="300" inputmode="decimal" />
+    <input type="text" id="p-peso" placeholder="kg (ej. 75.5)" inputmode="decimal" autocomplete="off" />
     <input type="text" id="p-nota" placeholder="Nota opcional..." />
     <button class="btn-add" id="btn-add-peso" onclick="pesoAgregar()">+ Agregar</button>
   </div>
@@ -409,10 +409,18 @@ function setSyncStatus(estado, texto) {
 
 function pesoAgregar() {
   const fecha = document.getElementById('p-fecha').value;
-  const peso  = parseFloat(document.getElementById('p-peso').value);
+  // Aceptar tanto coma como punto decimal (teclado iOS usa coma)
+  const pesoRaw = document.getElementById('p-peso').value.replace(',', '.').trim();
+  const peso  = parseFloat(pesoRaw);
   const nota  = document.getElementById('p-nota').value.trim();
-  if (!fecha || isNaN(peso) || peso < 30 || peso > 300) {
-    document.getElementById('p-peso').focus(); return;
+  if (!fecha) {
+    showToast('⚠️ Selecciona una fecha', 'err');
+    return;
+  }
+  if (isNaN(peso) || peso < 20 || peso > 400) {
+    showToast('⚠️ Ingresa un peso válido (ej. 75.5)', 'err');
+    document.getElementById('p-peso').focus();
+    return;
   }
   registros.push({ fecha, peso, nota });
   registros.sort((a,b) => a.fecha.localeCompare(b.fecha));
