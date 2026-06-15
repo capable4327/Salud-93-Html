@@ -367,9 +367,21 @@ if (tg) { tg.ready(); tg.expand(); }
 // ══════════════════════════════════════════════════
 function safeSave(key, data) {
   const json = JSON.stringify(data);
+  // localStorage siempre como respaldo principal
   try { localStorage.setItem(key, json); } catch(e) {}
+  // CloudStorage de Telegram tiene límite de ~4KB por clave
   if (tg?.CloudStorage) {
-    tg.CloudStorage.setItem(key, json, () => {});
+    if (json.length > 4000) {
+      // Demasiado grande para CloudStorage: se guarda solo localmente
+      setSyncStatus && setSyncStatus('error', '⚠️ solo local (datos extensos)');
+      showToast('⚠️ Guardado solo en este equipo (datos extensos)', 'err');
+      return;
+    }
+    tg.CloudStorage.setItem(key, json, (err) => {
+      if (err) {
+        showToast('⚠️ No se pudo sincronizar a la nube', 'err');
+      }
+    });
   }
 }
 
@@ -576,7 +588,23 @@ const ahora = new Date();
 document.getElementById('c-fecha').value = ahora.toISOString().split('T')[0];
 document.getElementById('c-hora').value  = ahora.toTimeString().slice(0,5);
 
-function comidaGuardar() { safeSave('sb_comidas', cData); }
+function comidaGuardar() {
+  // Guardar comidas particionadas por mes para no exceder el límite de 4KB por clave
+  const meses = {};
+  Object.keys(cData).forEach(fecha => {
+    const mes = fecha.slice(0, 7); // "YYYY-MM"
+    if (!meses[mes]) meses[mes] = {};
+    meses[mes][fecha] = cData[fecha];
+  });
+
+  // Guardar el índice de meses que existen
+  safeSave('sb_comidas_meses', Object.keys(meses));
+
+  // Guardar cada mes en su propia clave
+  Object.keys(meses).forEach(mes => {
+    safeSave('sb_comidas_' + mes, meses[mes]);
+  });
+}
 
 function setPunt(val) {
   puntSelected = val;
@@ -727,10 +755,34 @@ safeLoad('sb_peso', [], (data) => {
   setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
 });
 
-safeLoad('sb_comidas', {}, (data) => {
-  cData = (data && typeof data === 'object') ? data : {};
-  comidaRender();
-});
+// Cargar comidas — formato nuevo (por meses) con migración del formato viejo
+function cargarComidas() {
+  safeLoad('sb_comidas_meses', null, (meses) => {
+    if (Array.isArray(meses) && meses.length > 0) {
+      // Formato nuevo: cargar cada mes
+      cData = {};
+      let pendientes = meses.length;
+      meses.forEach(mes => {
+        safeLoad('sb_comidas_' + mes, {}, (datosMes) => {
+          if (datosMes && typeof datosMes === 'object') {
+            Object.assign(cData, datosMes);
+          }
+          pendientes--;
+          if (pendientes === 0) comidaRender();
+        });
+      });
+    } else {
+      // Formato viejo o sin datos: cargar de la clave antigua y migrar
+      safeLoad('sb_comidas', {}, (data) => {
+        cData = (data && typeof data === 'object') ? data : {};
+        comidaRender();
+        // Migrar al formato nuevo si había datos
+        if (Object.keys(cData).length > 0) comidaGuardar();
+      });
+    }
+  });
+}
+cargarComidas();
 </script>
 </body>
 </html>
