@@ -461,6 +461,10 @@ function setSyncStatus(estado, texto) {
 }
 
 function pesoAgregar() {
+  if (!datosListos.peso) {
+    showToast('⏳ Espera un momento, cargando datos...', 'err');
+    return;
+  }
   const fecha = document.getElementById('p-fecha').value;
   // Limpiar el valor: quitar espacios, cambiar coma por punto, quitar cualquier cosa que no sea número o punto
   let pesoRaw = document.getElementById('p-peso').value
@@ -639,6 +643,10 @@ function setPunt(val) {
 }
 
 function comidaAgregar() {
+  if (!datosListos.comidas) {
+    showToast('⏳ Espera un momento, cargando datos...', 'err');
+    return;
+  }
   const fecha  = document.getElementById('c-fecha').value;
   const hora   = document.getElementById('c-hora').value;
   const tipo   = document.getElementById('c-tipo').value;
@@ -770,42 +778,109 @@ function comidaExportarCSV() {
 }
 
 // ══════════════════════════════════════════════════
-// INIT — carga datos desde CloudStorage o localStorage
+// INIT — carga SEGURA: combina nube + local (anti-pérdida)
 // ══════════════════════════════════════════════════
+let datosListos = { peso: false, comidas: false };
+
 setSyncStatus('syncing', 'cargando...');
 
-safeLoad('sb_peso', [], (data) => {
-  registros = Array.isArray(data) ? data : [];
+// Lee una clave de AMBAS fuentes (local y nube) y entrega las dos
+function leerAmbas(key, cb) {
+  let local = null;
+  try { local = JSON.parse(localStorage.getItem(key) || 'null'); } catch(e) { local = null; }
+  if (tg?.CloudStorage) {
+    tg.CloudStorage.getItem(key, (err, val) => {
+      let nube = null;
+      if (!err && val) { try { nube = JSON.parse(val); } catch(e) {} }
+      cb(local, nube);
+    });
+  } else {
+    cb(local, null);
+  }
+}
+
+// Combina dos listas de peso sin perder registros de ninguna fuente
+function combinarPeso(a, b) {
+  const map = new Map();
+  [...(Array.isArray(a)?a:[]), ...(Array.isArray(b)?b:[])].forEach(r => {
+    if (!r || r.peso == null || !r.fecha) return;
+    const k = r.fecha + '|' + r.peso + '|' + (r.nota || '');
+    map.set(k, r);
+  });
+  return [...map.values()].sort((x,y) => x.fecha.localeCompare(y.fecha));
+}
+
+// Combina dos objetos de comidas por fecha, uniendo las comidas de cada día
+function combinarComidas(a, b) {
+  const out = {};
+  const fuente = [a, b].filter(x => x && typeof x === 'object');
+  fuente.forEach(obj => {
+    Object.keys(obj).forEach(fecha => {
+      if (!out[fecha]) { out[fecha] = { comidas: [], puntuacion: null }; }
+      const ids = new Set(out[fecha].comidas.map(c => c.id));
+      (obj[fecha].comidas || []).forEach(c => { if (!ids.has(c.id)) out[fecha].comidas.push(c); });
+      if (!out[fecha].puntuacion && obj[fecha].puntuacion) out[fecha].puntuacion = obj[fecha].puntuacion;
+    });
+  });
+  return out;
+}
+
+// ── PESO: cargar combinando y sanar la nube ──
+leerAmbas('sb_peso', (local, nube) => {
+  registros = combinarPeso(local, nube);
+  datosListos.peso = true;
+  // Re-guardar lo combinado para reparar cualquier pérdida previa
+  if (registros.length > 0) safeSave('sb_peso', registros);
   pesoRender();
   setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
 });
 
-// Cargar comidas — formato nuevo (por meses) con migración del formato viejo
+// ── COMIDAS: cargar combinando todas las fuentes posibles ──
 function cargarComidas() {
-  safeLoad('sb_comidas_meses', null, (meses) => {
-    if (Array.isArray(meses) && meses.length > 0) {
-      // Formato nuevo: cargar cada mes
-      cData = {};
-      let pendientes = meses.length;
+  // 1. Reunir comidas locales (formato nuevo por meses + formato viejo)
+  let comidasLocal = {};
+  try {
+    const mesesLocal = JSON.parse(localStorage.getItem('sb_comidas_meses') || 'null');
+    if (Array.isArray(mesesLocal)) {
+      mesesLocal.forEach(mes => {
+        try { Object.assign(comidasLocal, JSON.parse(localStorage.getItem('sb_comidas_' + mes) || '{}')); } catch(e) {}
+      });
+    }
+    const viejoLocal = JSON.parse(localStorage.getItem('sb_comidas') || 'null');
+    if (viejoLocal && typeof viejoLocal === 'object') comidasLocal = combinarComidas(comidasLocal, viejoLocal);
+  } catch(e) {}
+
+  // 2. Reunir comidas de la nube
+  leerAmbas('sb_comidas_meses', (mesesL, mesesNube) => {
+    const meses = Array.isArray(mesesNube) ? mesesNube : (Array.isArray(mesesL) ? mesesL : []);
+    let comidasNube = {};
+    if (meses.length > 0) {
+      let pend = meses.length;
       meses.forEach(mes => {
-        safeLoad('sb_comidas_' + mes, {}, (datosMes) => {
-          if (datosMes && typeof datosMes === 'object') {
-            Object.assign(cData, datosMes);
-          }
-          pendientes--;
-          if (pendientes === 0) comidaRender();
+        leerAmbas('sb_comidas_' + mes, (l, n) => {
+          if (n && typeof n === 'object') comidasNube = combinarComidas(comidasNube, n);
+          if (l && typeof l === 'object') comidasNube = combinarComidas(comidasNube, l);
+          pend--;
+          if (pend === 0) finalizarComidas(comidasLocal, comidasNube);
         });
       });
     } else {
-      // Formato viejo o sin datos: cargar de la clave antigua y migrar
-      safeLoad('sb_comidas', {}, (data) => {
-        cData = (data && typeof data === 'object') ? data : {};
-        comidaRender();
-        // Migrar al formato nuevo si había datos
-        if (Object.keys(cData).length > 0) comidaGuardar();
+      // Sin formato nuevo: intentar formato viejo de la nube
+      leerAmbas('sb_comidas', (l, n) => {
+        if (n && typeof n === 'object') comidasNube = combinarComidas(comidasNube, n);
+        if (l && typeof l === 'object') comidasNube = combinarComidas(comidasNube, l);
+        finalizarComidas(comidasLocal, comidasNube);
       });
     }
   });
+}
+
+function finalizarComidas(local, nube) {
+  cData = combinarComidas(local, nube);
+  datosListos.comidas = true;
+  // Re-guardar lo combinado para reparar pérdidas previas
+  if (Object.keys(cData).length > 0) comidaGuardar();
+  comidaRender();
 }
 cargarComidas();
 </script>
