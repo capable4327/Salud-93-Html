@@ -238,8 +238,8 @@
     <div class="nav-sub">Santiago · peso y alimentación</div>
   </div>
   <div class="tab-switcher">
-    <button class="tab-btn active" onclick="switchTab('peso')">⚖️ Peso</button>
-    <button class="tab-btn" onclick="switchTab('comidas')">🍽️ Comidas</button>
+    <button class="tab-btn active" onclick="switchTab('peso', this)">⚖️ Peso</button>
+    <button class="tab-btn" onclick="switchTab('comidas', this)">🍽️ Comidas</button>
   </div>
 </div>
 
@@ -397,7 +397,7 @@ function safeSave(key, data) {
   if (tg?.CloudStorage) {
     if (json.length > 4000) {
       // Demasiado grande para CloudStorage: se guarda solo localmente
-      setSyncStatus && setSyncStatus('error', '⚠️ solo local (datos extensos)');
+      if (typeof setSyncStatus === 'function') setSyncStatus('error', '⚠️ solo local (datos extensos)');
       showToast('⚠️ Guardado solo en este equipo (datos extensos)', 'err');
       return;
     }
@@ -434,14 +434,35 @@ function showToast(msg, tipo = '') {
   setTimeout(() => { t.className = 'toast'; }, 2500);
 }
 
+// Helper para fechas en zona horaria local (evita bug UTC de toISOString)
+function fmtDateLocal(d = new Date()) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+// Escapar HTML para prevenir XSS
+function esc(str) {
+  if (str == null) return '';
+  const div = document.createElement('div');
+  div.textContent = String(str);
+  return div.innerHTML;
+}
+
+// Feedback táctil (Telegram WebApp)
+function haptic(type = 'light') {
+  if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred(type);
+}
+
 // ══════════════════════════════════════════════════
 // TAB SWITCHER
 // ══════════════════════════════════════════════════
-function switchTab(tab) {
+function switchTab(tab, btn) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-' + tab).classList.add('active');
-  event.currentTarget.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (tab === 'peso') pesoRender();
   if (tab === 'comidas') comidaRender();
 }
@@ -452,7 +473,7 @@ function switchTab(tab) {
 let registros = [];
 let chart = null;
 
-document.getElementById('p-fecha').value = new Date().toISOString().split('T')[0];
+document.getElementById('p-fecha').value = fmtDateLocal();
 
 function setSyncStatus(estado, texto) {
   const el = document.getElementById('sync-status');
@@ -490,11 +511,13 @@ function pesoAgregar() {
   document.getElementById('p-peso').value = '';
   document.getElementById('p-nota').value = '';
   showToast('Registro guardado ✓', 'ok');
+  haptic('light');
   setSyncStatus('ok', tg?.CloudStorage ? '☁️ Telegram' : 'local');
   pesoRender();
 }
 
 function pesoEliminar(i) {
+  if (!confirm('¿Eliminar este registro de peso?')) return;
   registros.splice(i, 1);
   safeSave('sb_peso', registros);
   pesoRender();
@@ -547,7 +570,7 @@ function pesoRender() {
       <td class="fecha">${fmtFecha(r.fecha)}</td>
       <td class="peso-val">${r.peso.toFixed(1)} kg</td>
       <td>${badge}</td>
-      <td class="nota-val">${r.nota || ''}</td>
+      <td class="nota-val">${esc(r.nota)}</td>
       <td><button class="btn-del" onclick="pesoEliminar(${i})">×</button></td>
     </tr>`;
   }
@@ -557,6 +580,10 @@ function pesoRender() {
   const data   = registros.map(r => r.peso);
 
   if (chart) chart.destroy();
+  if (typeof Chart === 'undefined') {
+    document.querySelector('.chart-wrap').innerHTML = '<div class="empty">Sin conexión — gráfica no disponible</div>';
+    return;
+  }
   const ctx = document.getElementById('chart').getContext('2d');
   chart = new Chart(ctx, {
     type: 'line',
@@ -603,8 +630,10 @@ function pesoExportarCSV() {
   registros.forEach(r => rows.push([fmtFecha(r.fecha), r.peso, r.nota || '']));
   const csv  = rows.map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const a    = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'peso-santiago.csv'; a.click();
+  const a    = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  a.href = url; a.download = 'peso-santiago.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 // ══════════════════════════════════════════════════
@@ -614,7 +643,7 @@ let cData = {};
 let puntSelected = null;
 
 const ahora = new Date();
-document.getElementById('c-fecha').value = ahora.toISOString().split('T')[0];
+document.getElementById('c-fecha').value = fmtDateLocal(ahora);
 document.getElementById('c-hora').value  = ahora.toTimeString().slice(0,5);
 
 function comidaGuardar() {
@@ -665,11 +694,13 @@ function comidaAgregar() {
 
   comidaGuardar();
   showToast('comida registrada ✓', 'ok');
+  haptic('light');
   comidaRender();
 }
 
 function comidaEliminar(fecha, id) {
   if (!cData[fecha]) return;
+  if (!confirm('¿Eliminar esta comida?')) return;
   cData[fecha].comidas = cData[fecha].comidas.filter(c => c.id !== id);
   if (!cData[fecha].comidas.length && !cData[fecha].puntuacion) delete cData[fecha];
   comidaGuardar();
@@ -684,14 +715,14 @@ function fmtDia(f) {
 }
 
 function comidaRender() {
-  const today  = new Date().toISOString().split('T')[0];
+  const today  = fmtDateLocal();
   const fechas = Object.keys(cData).sort((a,b) => b.localeCompare(a));
 
   const todayData = cData[today];
   document.getElementById('m-hoy').textContent = todayData ? todayData.comidas.length : 0;
 
   const semanaMs    = 7 * 24 * 60 * 60 * 1000;
-  const semanaStart = new Date(Date.now() - semanaMs).toISOString().split('T')[0];
+  const semanaStart = fmtDateLocal(new Date(Date.now() - semanaMs));
   let semanaCount   = 0;
   fechas.forEach(f => { if (f >= semanaStart) semanaCount += (cData[f].comidas || []).length; });
   document.getElementById('m-semana').textContent = semanaCount;
@@ -700,7 +731,7 @@ function comidaRender() {
   let racha     = 0;
   let checkDate = new Date();
   for (let i = 0; i < 60; i++) {
-    const key = checkDate.toISOString().split('T')[0];
+    const key = fmtDateLocal(checkDate);
     if (cData[key] && cData[key].comidas.length > 0) racha++;
     else if (i > 0) break;
     checkDate.setDate(checkDate.getDate() - 1);
@@ -712,7 +743,7 @@ function comidaRender() {
   barEl.innerHTML = '';
   for (let i = 13; i >= 0; i--) {
     const d   = new Date(); d.setDate(d.getDate() - i);
-    const key = d.toISOString().split('T')[0];
+    const key = fmtDateLocal(d);
     const dia = document.createElement('div');
     dia.className = 'racha-dia';
     dia.textContent = d.getDate();
@@ -746,8 +777,8 @@ function comidaRender() {
         <div class="comida-hora">${c.hora}</div>
         <div class="comida-tipo tipo-${c.tipo}">${c.tipo}</div>
         <div class="comida-desc">
-          <div class="comida-nombre">${c.comida}</div>
-          ${c.nota ? `<div class="comida-nota">${c.nota}</div>` : ''}
+          <div class="comida-nombre">${esc(c.comida)}</div>
+          ${c.nota ? `<div class="comida-nota">${esc(c.nota)}</div>` : ''}
         </div>
         <button class="btn-del" onclick="comidaEliminar('${f}', ${c.id})">×</button>
       </div>`).join('');
@@ -773,13 +804,16 @@ function comidaExportarCSV() {
   });
   const csv  = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
-  const a    = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'comidas-santiago.csv'; a.click();
+  const a    = document.createElement('a');
+  const url  = URL.createObjectURL(blob);
+  a.href = url; a.download = 'comidas-santiago.csv'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 // ══════════════════════════════════════════════════
 // INIT — carga SEGURA: combina nube + local (anti-pérdida)
 // ══════════════════════════════════════════════════
+let _cargarTimeout = null;
 let datosListos = { peso: false, comidas: false };
 
 setSyncStatus('syncing', 'cargando...');
@@ -839,6 +873,15 @@ leerAmbas('sb_peso', (local, nube) => {
 function cargarComidas() {
   // 1. Reunir comidas locales (formato nuevo por meses + formato viejo)
   let comidasLocal = {};
+  // Timeout de seguridad: si la nube no responde en 5s, usar solo local
+  _cargarTimeout = setTimeout(() => {
+    if (!datosListos.comidas) {
+      datosListos.comidas = true;
+      cData = combinarComidas(comidasLocal, {});
+      comidaRender();
+      showToast('⚠️ Sincronización lenta, usando datos locales', 'err');
+    }
+  }, 5000);
   try {
     const mesesLocal = JSON.parse(localStorage.getItem('sb_comidas_meses') || 'null');
     if (Array.isArray(mesesLocal)) {
